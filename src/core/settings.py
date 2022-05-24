@@ -87,11 +87,11 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.postgresql_psycopg2"),
-        "NAME": os.environ.get("DB_NAME", "apple"),
-        "USER": os.environ.get("DB_USER", "apple"),
+        "NAME": os.environ.get("DB_NAME", "kino-teatr"),
+        "USER": os.environ.get("DB_USER", "root"),
         "PASSWORD": os.environ.get("DB_PASSWORD", "root"),
         "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("DB_PORT", "5430"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 

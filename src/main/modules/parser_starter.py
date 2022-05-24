@@ -1,62 +1,22 @@
-from datetime import datetime
+import json
 
 import requests
-import schedule
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
 from bs4 import BeautifulSoup
-from peewee import MySQLDatabase, Model, IntegerField, CharField, TextField, PrimaryKeyField
 
-pg_db = MySQLDatabase(database="apiparser", user='iriparser', password='asdflk#$KGf8FD&fasdjkksdf', host='89.223.67.114',
-                      port=3306, charset='utf8mb4')
-
-class BaseModel(Model):
-    class Meta:
-        database = pg_db
+from main.models import MetricsModel, Task, CommentsModel, TaskResult
+from main.models.states import MetricsNameModel
 
 
-class Comments(BaseModel):
-    id = IntegerField(primary_key=True)
-    comment_id = CharField(max_length=200)
-    user_id = CharField(max_length=200)
-    name = CharField(max_length=200)
-    comment = TextField()
-    comment_original = TextField()
-    like_count = IntegerField()
-    published = CharField(max_length=200)
-    video_id_id = IntegerField()
-
-
-class Metrics(BaseModel):
-    id = PrimaryKeyField(null=False)
-    material_id = IntegerField()
-    id_metrics_name = IntegerField()
-    value = CharField(max_length=255)
-    time = IntegerField(default=0)
-
-
-class Content(BaseModel):
-    id_content = PrimaryKeyField(null=False)
-    resource = CharField(max_length=255)
-    created_at = IntegerField()
-    project_name = CharField(max_length=255)
-    id_format_content = IntegerField()
-    name_content = CharField(max_length=255)
-    url = CharField(max_length=255, unique=True)
-    success = IntegerField(default=0)
-    success_date_update = IntegerField()
-    acc_type = IntegerField()
-
-
-def record_rating(rating, content_id):
-    split_string = rating.split('/')
+def record_rating(task, rating_before, content, rating_id):
+    split_string = rating_before.split('/')
     item = split_string[0].strip()
     print(item)
 
-    Metrics.create(material_id=content_id, id_metric_name=36, value=item)
+    metrics = MetricsModel(task=task, link=content, metrics_name=rating_id, value=item)
+    metrics.save()
 
 
-def record_movie_comments(page_numbers, forum_page, content_id):
+def record_movie_comments(task, page_numbers, forum_page, content):
     for page in range(1, page_numbers + 1):
         try:
             forum_page = forum_page + f'f{page}/'
@@ -82,14 +42,14 @@ def record_movie_comments(page_numbers, forum_page, content_id):
                 except Exception:
                     pass
 
-                Comments.get_or_create(comment=text, comment_original=text, video_id_id=content_id,
-                                       name=author, published=date)
+                comments = CommentsModel(task=task, link=content, comment=text, author=author, published_date=date)
+                comments.save()
 
         except Exception:
             pass
 
 
-def record_post_comments(comment_user_list, comment_text_list, content_id):
+def record_post_comments(task, comment_user_list, comment_text_list, content):
     for user, text in zip(comment_user_list, comment_text_list):
         try:
             author = user.find('strong').text
@@ -100,25 +60,23 @@ def record_post_comments(comment_user_list, comment_text_list, content_id):
         except Exception:
             pass
 
-        Comments.get_or_create(comment=comment_text, comment_original=text, video_id_id=content_id,
-                               name=author, published=date)
+        comments = CommentsModel(task=task, link=content, comment=comment_text, author=author, published_date=date)
+        comments.save()
 
 
-
-def parser():
+def parser_starter(task_id, items):
     print('start')
-    cur = pg_db.cursor()
-    cur.execute('SELECT * from content where resource = "KINOTEATR"')
-    rows = cur.fetchall()
-    cur.close()
+    task = Task.objects.get(id=task_id)
+    task.status_id = 2
+    task.save()
 
-    for row in rows:
-        link = row[6]
+    rating_id = MetricsNameModel.objects.get(id=1)
 
-        try:
-            if '/news/' in link:
+    for content in items:
+        # try:
+            if '/news/' in content:
                 try:
-                    link = link + 'forum/'
+                    link = content + 'forum/'
                     response = requests.get(link).text
                     soup = BeautifulSoup(response, 'lxml')
 
@@ -131,21 +89,21 @@ def parser():
                     print('no comments')
 
                 if comment_user_list is not None and comment_text_list is not None:
-                    record_post_comments(comment_user_list, comment_text_list, row[0])
+                    record_post_comments(task, comment_user_list, comment_text_list, content)
 
-            elif '/movie/' in link:
+            elif '/movie/' in content:
 
                 try:
-                    response = requests.get(link).text
+                    response = requests.get(content).text
                     soup = BeautifulSoup(response, 'lxml')
                     rating = soup.find(class_='rating_block').find('span').text
-                    record_rating(rating, row[0])
+                    record_rating(task, rating, content, rating_id)
 
                 except Exception:
                     print('no reactions')
 
                 try:
-                    link = link[:-6] + 'forum/'
+                    link = content[:-6] + 'forum/'
                     forum_page = requests.get(link).text
                     soup = BeautifulSoup(forum_page, 'lxml')
                     page_numbers = int(soup.find(class_='page_numbers').find_all('a')[-2].text)
@@ -154,7 +112,7 @@ def parser():
                     page_numbers = 1
 
                 try:
-                    record_movie_comments(page_numbers, link, row[0])
+                    record_movie_comments(task, page_numbers, link, content)
 
                 except Exception:
                     pass
@@ -162,25 +120,48 @@ def parser():
             else:
                 print('continue')
 
-        except Exception:
-            print('wrong link')
+            # except Exception:
+            #     print('wrong link')
 
     print('end')
 
+    metrics_result = MetricsModel.objects.filter(task_id=task_id)
+    comments_result = CommentsModel.objects.filter(task_id=task_id)
+    print(metrics_result)
+    print(comments_result)
+    if metrics_result.exists() or comments_result.exists():
+        result_list = []
+        d = {}
+        d['task_id'] = task_id
+        if metrics_result.exists():
+            for res in metrics_result:
+                d['link'] = res.link
+                d['metrics_id'] = res.metrics_name.pk
+                d['value'] = res.value
 
-scheduler = BlockingScheduler(daemon=True)
-date_now = datetime.now().strftime('%H:%M:%S:%f')
-print(date_now)
-# from now - 3
-date_time_str = '23:25:00'
+        if comments_result.exists():
+            comments = []
+            d['link'] = comments_result[0].link
+            for res in comments_result:
+                comments_dic = {}
+                comments_dic['author'] = res.author
+                comments_dic['text'] = res.comment
+                comments_dic['published_date'] = res.published_date
 
-date_time = datetime.strptime(date_time_str, '%H:%M:%S')
-print(date_time.strftime('%H:%M:%S:%f'))
-scheduler.add_job(parser, trigger=CronTrigger(hour=date_time.hour, minute=date_time.minute),
-replace_existing=True)
+                comments.append(comments_dic)
 
-try:
-    scheduler.start()
-except KeyboardInterrupt as e:
-    print(e)
-    scheduler.shutdown()
+            d['comments'] = comments
+
+        print(d)
+        result_list.append(d)
+
+        with open(f"files/task__{task_id}.json", "w", encoding='utf-8') as write_file:
+            json.dump(result_list, write_file, ensure_ascii=False)
+
+        TaskResult.objects.create(task_id=task_id, link=f"task__{task_id}.json", comment=None)
+
+    else:
+        TaskResult.objects.create(task_id=task_id, link=None, comment='Failed to receive metrics and comments')
+
+    task.status_id = 3
+    task.save()

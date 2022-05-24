@@ -6,8 +6,8 @@ services:
     ports:
       - 5432:5432
     environment:
-      POSTGRES_DB: apple
-      POSTGRES_USER: apple
+      POSTGRES_DB: kino-teatr
+      POSTGRES_USER: root
       POSTGRES_PASSWORD: root
     volumes:
       - "db:/var/lib/postgresql/data/"

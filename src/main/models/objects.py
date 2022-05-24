@@ -3,6 +3,8 @@ from django.db import models
 
 from main.models.states import FormatContentModel, MetricsNameModel
 
+from main.models import Task
+
 
 class ContentModel(BaseModel):
     id = models.BigAutoField(primary_key=True, db_column='id_content')
@@ -21,11 +23,23 @@ class ContentModel(BaseModel):
 
 
 class MetricsModel(BaseModel):
-    material = models.ForeignKey(ContentModel, null=True, on_delete=models.SET_NULL)
+    task = models.ForeignKey(Task, null=True, on_delete=models.SET_NULL)
+    link = models.TextField()
     metrics_name = models.ForeignKey(MetricsNameModel, null=True, on_delete=models.SET_NULL,
                                      db_column='id_metrics_name')
-    value = models.BigIntegerField(null=True)
+    value = models.CharField(max_length=255, null=True)
     time = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'metrics'
+
+
+class CommentsModel(BaseModel):
+    task = models.ForeignKey(Task, null=True, on_delete=models.SET_NULL)
+    link = models.TextField()
+    comment = models.TextField()
+    author = models.CharField(max_length=255)
+    published_date = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'comments'
