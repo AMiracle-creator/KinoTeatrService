@@ -1,0 +1,5 @@
+[
+  {"model":  "main.taskstatus", "pk": 1, "fields": {"name": "waiting"}},
+  {"model":  "main.taskstatus", "pk": 2, "fields": {"name": "in work"}},
+  {"model":  "main.taskstatus", "pk": 3, "fields": {"name": "done"}}
+]

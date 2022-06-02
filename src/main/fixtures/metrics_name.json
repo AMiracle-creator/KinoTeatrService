@@ -1,0 +1,3 @@
+[
+  {"model":  "main.metricsnamemodel", "pk": 1, "fields": {"name": "rating"}}
+]

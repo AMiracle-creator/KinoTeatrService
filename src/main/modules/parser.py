@@ -182,7 +182,7 @@ scheduler = BlockingScheduler(daemon=True)
 date_now = datetime.now().strftime('%H:%M:%S:%f')
 print(date_now)
 # from now - 3
-date_time_str = '23:25:00'
+date_time_str = '16:01:00'
 
 date_time = datetime.strptime(date_time_str, '%H:%M:%S')
 print(date_time.strftime('%H:%M:%S:%f'))
