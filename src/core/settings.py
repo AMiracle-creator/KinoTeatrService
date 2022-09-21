@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-760y^@!lkc$16^r3$%bam-8w(+ow#o1%!ff%t56q23@3sqir97
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['193.164.150.195']
+ALLOWED_HOSTS = ['127.0.0.1']
 
 
 # Application definition
@@ -90,7 +90,7 @@ DATABASES = {
         "NAME": os.environ.get("DB_NAME", "kino-teatr"),
         "USER": os.environ.get("DB_USER", "root"),
         "PASSWORD": os.environ.get("DB_PASSWORD", "root"),
-        "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
+        "HOST": os.environ.get("DB_HOST", "193.164.150.195"),
         "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }

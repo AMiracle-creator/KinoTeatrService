@@ -13,24 +13,24 @@ class StatusSerializer(serializers.ModelSerializer):
 
 class TaskSerializer(serializers.ModelSerializer):
     task_id = serializers.PrimaryKeyRelatedField(source='id', read_only=True)
-    task_type_id = serializers.PrimaryKeyRelatedField(source='task_type', queryset=TaskType.objects.all())
     status = StatusSerializer(read_only=True)
+    id = serializers.CharField(source='lk_id')
+    logins = serializers.JSONField(source='data')
+    type = serializers.PrimaryKeyRelatedField(source='task_type', queryset=TaskType.objects.all())
 
     def validate(self, attrs):
-        data = attrs.get('data')
+        logins = attrs.get('data')
 
-        if not data:
+        if not logins:
             raise serializers.ValidationError('task must have data')
-
-        if not data.keys() or not list(data.values())[0]:
-            raise serializers.ValidationError('task must have loms')
 
         return attrs
 
     class Meta:
         model = Task
-        fields = ['task_id', 'task_type_id', 'data', 'priority', 'fields', 'status']
+        fields = ['id', 'logins', 'type', 'task_id', 'status']
         read_only_fields = ('task_id', 'status')
+
 
 
 class TaskResultSerializer(serializers.ModelSerializer):

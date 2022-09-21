@@ -4,6 +4,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework import status
 
 from .models import Task, TaskResult, ExtraData
 from .models.states import TaskType
@@ -27,16 +28,19 @@ class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
 
     def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
+        print("XXXX_ ", request.data)
+        response = super().create(request, *args, **kwargs, status=status.HTTP_200_OK)
 
-        items = request.data['data']['items']
+        print("ZZZZ_ ", response)
+        items = request.data['logins']
 
         if type(items) != type([]):
             return Response({"message": 'items is not list'})
 
-        parser_starter(response.data['task_id'], items)
+        parser_starter(response.data['task_id'], response.data['id'], items)
 
-        return response
+        return Response(status=status.HTTP_200_OK)
+
 
 
 class TaskResultViewSet(ReadOnlyModelViewSet):

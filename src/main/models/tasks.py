@@ -6,17 +6,14 @@ from main.models.states import TaskType, TaskStatus
 
 
 class Task(BaseModel):
+    lk_id = models.CharField(max_length=255, default='')
     task_type = models.ForeignKey(TaskType, null=True, on_delete=models.SET_NULL)
     status = models.ForeignKey(TaskStatus, null=True, on_delete=models.SET_NULL)
     data = models.JSONField()
-    priority = models.IntegerField()
-    fields = ArrayField(
-        models.CharField(max_length=50)
-    )
 
     def __str__(self):
         return f'id: {self.id or None}, task_type: {self.task_type}, status: {self.status}, ' \
-               f'data: {self.data}, priority: {self.priority}, fields: {self.fields}'
+               f'data: {self.data}'
 
     class Meta:
         db_table = 'task'
