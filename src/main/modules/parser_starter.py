@@ -72,23 +72,23 @@ def parser_starter(task_id, lk_id, items):
     task.lk_id = lk_id
     task.save()
 
-    print(f"Send data to LK")
-    try:
-        LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-        status_dic = {"status": "queue"}
-        requests.patch(url=LK_URL, json=status_dic)
-    except Exception as e:
-        print(f"Exception in PATCH requst {e}")
-
+    # print(f"Send data to LK")
+    # try:
+    #     LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+    #     status_dic = {"status": "queue"}
+    #     requests.patch(url=LK_URL, json=status_dic)
+    # except Exception as e:
+    #     print(f"Exception in PATCH requst {e}")
+    #
 
     rating_id = MetricsNameModel.objects.get(id=1)
 
-    try:
-        LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-        status_dic = {"status": "performing"}
-        requests.patch(url=LK_URL, json=status_dic)
-    except Exception as e:
-        print(f"Exception in PATCH requst {e}")
+    # try:
+    #     LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+    #     status_dic = {"status": "performing"}
+    #     requests.patch(url=LK_URL, json=status_dic)
+    # except Exception as e:
+    #     print(f"Exception in PATCH requst {e}")
 
     for content in items:
         try:
@@ -141,16 +141,16 @@ def parser_starter(task_id, lk_id, items):
         except Exception:
             print('wrong link')
 
-            try:
-                task.status_id = 4
-                task.save()
-                LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-                status_dic = {"statusCode": 400, "message": ["This login(link) cannot be parsed"],
-                              "error": "Wrong login", "status": "error"}
-                status_dic = {"status": "error"}
-                requests.patch(url=LK_URL, json=status_dic)
-            except Exception as e:
-                print(f"Exception in PATCH requst {e}")
+            # try:
+            #     task.status_id = 4
+            #     task.save()
+            #     LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+            #     status_dic = {"statusCode": 400, "message": ["This login(link) cannot be parsed"],
+            #                   "error": "Wrong login", "status": "error"}
+            #     status_dic = {"status": "error"}
+            #     requests.patch(url=LK_URL, json=status_dic)
+            # except Exception as e:
+            #     print(f"Exception in PATCH requst {e}")
 
     metrics_result = MetricsModel.objects.filter(task_id=task_id)
     comments_result = CommentsModel.objects.filter(task_id=task_id)
@@ -184,17 +184,17 @@ def parser_starter(task_id, lk_id, items):
             result_for_lk['pattern'] = "new_response"
             result_for_lk['data'] = d
 
-            try:
-                connection = pika.BlockingConnection(pika.URLParameters('amqp://rmq:t87VxFvCSYLK@130.193.43.169:45672'))
-                channel = connection.channel()
-                channel.queue_declare(queue='results', durable=True)
-                channel.basic_publish(exchange='results', routing_key='result', body=json.dumps(result_for_lk))
-                channel.start_consuming()
-                task.status_id = 3
-                task.save()
-
-            except Exception:
-                print("RabitMq error")
+            # try:
+            #     connection = pika.BlockingConnection(pika.URLParameters('amqp://rmq:t87VxFvCSYLK@130.193.43.169:45672'))
+            #     channel = connection.channel()
+            #     channel.queue_declare(queue='results', durable=True)
+            #     channel.basic_publish(exchange='results', routing_key='result', body=json.dumps(result_for_lk))
+            #     channel.start_consuming()
+            #     task.status_id = 3
+            #     task.save()
+            #
+            # except Exception:
+            #     print("RabitMq error")
 
         print(d)
         result_list.append(d)
@@ -210,12 +210,12 @@ def parser_starter(task_id, lk_id, items):
     task.status_id = 3
     task.save()
 
-    if task.status_id == 3:
-        try:
-            LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-            status_dic = {"status": "completed"}
-            requests.patch(url=LK_URL, json=status_dic)
-        except Exception as e:
-            print(f"Exception in POST requst {e}")
+    # if task.status_id == 3:
+    #     try:
+    #         LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+    #         status_dic = {"status": "completed"}
+    #         requests.patch(url=LK_URL, json=status_dic)
+    #     except Exception as e:
+    #         print(f"Exception in POST requst {e}")
 
     print('end')
