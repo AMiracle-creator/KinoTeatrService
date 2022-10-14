@@ -17,7 +17,7 @@ def record_rating(task, rating_before, content, rating_id):
     metrics.save()
 
 
-def record_movie_comments(task, page_numbers, forum_page, content):
+def record_movie_comments(task, page_numbers, forum_page, content, type):
     for page in range(1, page_numbers + 1):
         try:
             forum_page = forum_page + f'f{page}/'
@@ -65,52 +65,79 @@ def record_post_comments(task, comment_user_list, comment_text_list, content):
         comments.save()
 
 
-def parser_starter(task_id, lk_id, items):
+def send_result(result, task):
+    try:
+        connection = pika.BlockingConnection(pika.URLParameters('amqp://rmq:t87VxFvCSYLK@queue.core.uzavr.ru:5672'))
+        channel = connection.channel()
+        channel.queue_declare(queue='results', durable=True)
+        channel.basic_publish(exchange='results', routing_key='results', body=json.dumps(result))
+        channel.start_consuming()
+        task.status_id = 3
+        task.save()
+
+    except Exception:
+        print("RabitMq error")
+
+
+def parser_starter(task_id, lk_id, items, task_type):
     print('start')
     task = Task.objects.get(id=task_id)
     task.status_id = 2
     task.lk_id = lk_id
     task.save()
 
-    # print(f"Send data to LK")
-    # try:
-    #     LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-    #     status_dic = {"status": "queue"}
-    #     requests.patch(url=LK_URL, json=status_dic)
-    # except Exception as e:
-    #     print(f"Exception in PATCH requst {e}")
-    #
+    print(f"Send data to LK")
+    try:
+        LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+        status_dic = {"status": "queue"}
+        requests.patch(url=LK_URL, json=status_dic)
+    except Exception as e:
+        print(f"Exception in PATCH requst {e}")
+
 
     rating_id = MetricsNameModel.objects.get(id=1)
+    comments_count_id = MetricsNameModel.objects.get(id=2)
 
-    # try:
-    #     LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-    #     status_dic = {"status": "performing"}
-    #     requests.patch(url=LK_URL, json=status_dic)
-    # except Exception as e:
-    #     print(f"Exception in PATCH requst {e}")
+    try:
+        LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+        status_dic = {"status": "performing"}
+        requests.patch(url=LK_URL, json=status_dic)
+    except Exception as e:
+        print(f"Exception in PATCH requst {e}")
 
     for content in items:
         try:
             if '/news/' in content:
-                try:
-                    link = content + 'forum/'
-                    response = requests.get(link).text
-                    soup = BeautifulSoup(response, 'lxml')
+                if task_type == 14:
+                    try:
+                        link = content + 'forum/'
+                        response = requests.get(link).text
+                        soup = BeautifulSoup(response, 'lxml')
 
-                    comment_user_list = soup.find_all('div', class_='comment_user')
-                    comment_text_list = soup.find_all('div', class_='comment_text_full')
+                        comment_user_list = soup.find_all('div', class_='comment_user')
+                        comment_text_list = soup.find_all('div', class_='comment_text_full')
 
-                except Exception:
-                    comment_user_list = None
-                    comment_text_list = None
-                    print('no comments')
+                    except Exception:
+                        comment_user_list = None
+                        comment_text_list = None
+                        print('no comments')
 
-                if comment_user_list is not None and comment_text_list is not None:
-                    record_post_comments(task, comment_user_list, comment_text_list, content)
+                    if comment_user_list is not None and comment_text_list is not None:
+                        record_post_comments(task, comment_user_list, comment_text_list, content)
+                else:
+                    try:
+                        response = requests.get(content).text
+                        soup = BeautifulSoup(response, 'lxml')
+                        comments_count = soup.find('div', class_='comments_count').text
+
+                        metrics = MetricsModel(task=task, link=content, metrics_name=comments_count_id,
+                                               value=comments_count)
+                        metrics.save()
+
+                    except Exception:
+                        print('no comments')
 
             elif '/movie/' in content:
-
                 try:
                     response = requests.get(content).text
                     soup = BeautifulSoup(response, 'lxml')
@@ -120,20 +147,30 @@ def parser_starter(task_id, lk_id, items):
                 except Exception:
                     print('no reactions')
 
-                try:
-                    link = content[:-6] + 'forum/'
-                    forum_page = requests.get(link).text
-                    soup = BeautifulSoup(forum_page, 'lxml')
-                    page_numbers = int(soup.find(class_='page_numbers').find_all('a')[-2].text)
+                if task_type == 14:
+                    try:
+                        link = content[:-6] + 'forum/'
+                        forum_page = requests.get(link).text
+                        soup = BeautifulSoup(forum_page, 'lxml')
+                        page_numbers = int(soup.find(class_='page_numbers').find_all('a')[-2].text)
 
-                except Exception:
-                    page_numbers = 1
+                    except Exception:
+                        page_numbers = 1
 
-                try:
-                    record_movie_comments(task, page_numbers, link, content)
+                    try:
+                        record_movie_comments(task, page_numbers, link, content)
 
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
+
+                else:
+                    response = requests.get(content).text
+                    soup = BeautifulSoup(response, 'lxml')
+                    comments_count = soup.find('div', class_='comments_count').text
+
+                    metrics = MetricsModel(task=task, link=content, metrics_name=comments_count_id,
+                                           value=comments_count)
+                    metrics.save()
 
             else:
                 print('continue')
@@ -141,39 +178,54 @@ def parser_starter(task_id, lk_id, items):
         except Exception:
             print('wrong link')
 
-            # try:
-            #     task.status_id = 4
-            #     task.save()
-            #     LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-            #     status_dic = {"statusCode": 400, "message": ["This login(link) cannot be parsed"],
-            #                   "error": "Wrong login", "status": "error"}
-            #     status_dic = {"status": "error"}
-            #     requests.patch(url=LK_URL, json=status_dic)
-            # except Exception as e:
-            #     print(f"Exception in PATCH requst {e}")
+            try:
+                task.status_id = 4
+                task.save()
+                LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+                status_dic = {"statusCode": 400, "message": ["This login(link) cannot be parsed"],
+                              "error": "Wrong login", "status": "error"}
+                status_dic = {"status": "error"}
+                requests.patch(url=LK_URL, json=status_dic)
+            except Exception as e:
+                print(f"Exception in PATCH requst {e}")
 
     metrics_result = MetricsModel.objects.filter(task_id=task_id)
     comments_result = CommentsModel.objects.filter(task_id=task_id)
     print(metrics_result)
     print(comments_result)
-    result_for_lk = {"pattern": "", "data": ""}
+    result_for_lk = {"pattern": "results", "data": ""}
     if metrics_result.exists() or comments_result.exists():
         result_list = []
 
-        d = {'taskId': lk_id, 'type': '', 'login': '', 'data': ''}
+        d = {'id': lk_id, 'type': '', 'login': '', 'status': 'completed', 'data': ''}
 
         if metrics_result.exists():
+            metrics = []
+            d['type'] = task_type
             for res in metrics_result:
-                d['link'] = res.link
-                d['metrics_id'] = res.metrics_name.pk
-                d['value'] = res.value
+                metrics_dic ={}
+                d['login'] = res.link
+                metrics_dic['metrics_id'] = res.metrics_name.pk
+                metrics_dic['value'] = res.value
+
+                metrics.append(metrics_dic)
+
+                d['data'] = metrics
+                result_for_lk['data'] = d
+
+                send_result(result_for_lk, task)
+
+            # d['data'] = metrics
+            # result_for_lk['data'] = d
+
+            # send_result(result_for_lk, task)
 
         if comments_result.exists():
             comments = []
-            d['type'] = "16"
-            d['login'] = comments_result[0].link
+            d['type'] = task_type
             for res in comments_result:
                 comments_dic = {}
+                d['login'] = res.link
                 comments_dic['author'] = res.author
                 comments_dic['text'] = res.comment
                 comments_dic['published_date'] = res.published_date
@@ -181,20 +233,9 @@ def parser_starter(task_id, lk_id, items):
                 comments.append(comments_dic)
 
             d['data'] = comments
-            result_for_lk['pattern'] = "new_response"
             result_for_lk['data'] = d
 
-            # try:
-            #     connection = pika.BlockingConnection(pika.URLParameters('amqp://rmq:t87VxFvCSYLK@130.193.43.169:45672'))
-            #     channel = connection.channel()
-            #     channel.queue_declare(queue='results', durable=True)
-            #     channel.basic_publish(exchange='results', routing_key='result', body=json.dumps(result_for_lk))
-            #     channel.start_consuming()
-            #     task.status_id = 3
-            #     task.save()
-            #
-            # except Exception:
-            #     print("RabitMq error")
+            send_result(result_for_lk, task)
 
         print(d)
         result_list.append(d)
@@ -210,12 +251,12 @@ def parser_starter(task_id, lk_id, items):
     task.status_id = 3
     task.save()
 
-    # if task.status_id == 3:
-    #     try:
-    #         LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
-    #         status_dic = {"status": "completed"}
-    #         requests.patch(url=LK_URL, json=status_dic)
-    #     except Exception as e:
-    #         print(f"Exception in POST requst {e}")
+    if task.status_id == 3:
+        try:
+            LK_URL = f'https://test.core.uzavr.ru/api/v1/task/{lk_id}'
+            status_dic = {"status": "completed"}
+            requests.patch(url=LK_URL, json=status_dic)
+        except Exception as e:
+            print(f"Exception in POST requst {e}")
 
     print('end')
